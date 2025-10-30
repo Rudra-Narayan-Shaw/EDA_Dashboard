@@ -4,6 +4,10 @@ import numpy as np
 import os
 from datetime import datetime
 from database import DatabaseManager
+import warnings
+
+# Suppress warnings
+warnings.filterwarnings('ignore')
 
 # Import the separate modules
 try:
@@ -41,7 +45,6 @@ def save_upload_history(filename, file_type, upload_time, file_size_bytes):
 
     # Verify database is connected
     if not st.session_state.db_manager.is_db_connected():
-        st.error("❌ Database not connected - cannot save upload history")
         return False
 
     # Save to database using DatabaseManager
@@ -60,7 +63,7 @@ def load_upload_history_from_db():
     return st.session_state.db_manager.get_upload_history()
 
 def display_upload_history():
-    """Display upload history table from persistent database"""
+    """Display upload history table from persistent database with delete button"""
     # Load history from database
     history_df = load_upload_history_from_db()
 
@@ -74,14 +77,30 @@ def display_upload_history():
             hide_index=True
         )
 
-        # Add download button for history
-        csv = history_df.to_csv(index=False)
-        st.download_button(
-            label="📥 Download Upload History",
-            data=csv,
-            file_name="upload_history.csv",
-            mime="text/csv"
-        )
+        # Add buttons for download and delete in two columns
+        col1, col2 = st.columns(2)
+
+        with col1:
+            # Download button
+            csv = history_df.to_csv(index=False)
+            st.download_button(
+                label="📥 Download Upload History",
+                data=csv,
+                file_name="upload_history.csv",
+                mime="text/csv"
+            )
+
+        with col2:
+            # Delete button
+            if st.button("🗑️ Delete Upload History", key="delete_history"):
+                # Delete and show confirmation
+                if st.session_state.db_manager.clear_upload_history():
+                    st.success("✅ Upload history deleted successfully!")
+                    st.info("📋 All upload records have been removed from the database.")
+                    # Refresh the page to show updated history
+                    st.rerun()
+                else:
+                    st.error("❌ Failed to delete upload history")
 
         # Show total files uploaded
         total_files = len(history_df)
@@ -123,55 +142,58 @@ def file_upload_section():
 
     if uploaded_file is not None:
         try:
-            # Get file size
-            file_size_bytes = uploaded_file.size
+            # Suppress warnings during file processing
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
 
-            # Read file based on type with proper encoding handling
-            if selected_file_type == ".csv":
-                try:
-                    df = pd.read_csv(uploaded_file)
-                except UnicodeDecodeError:
+                # Get file size
+                file_size_bytes = uploaded_file.size
+
+                # Read file based on type with proper encoding handling
+                if selected_file_type == ".csv":
                     try:
-                        uploaded_file.seek(0)
-                        df = pd.read_csv(uploaded_file, encoding="latin1")
+                        df = pd.read_csv(uploaded_file)
                     except UnicodeDecodeError:
-                        uploaded_file.seek(0)
-                        df = pd.read_csv(uploaded_file, encoding="cp1252")
-            elif selected_file_type == ".xlsx/.xls":
-                df = pd.read_excel(uploaded_file)
-            elif selected_file_type == ".txt":
-                df = pd.read_csv(uploaded_file, delimiter='\t')
+                        try:
+                            uploaded_file.seek(0)
+                            df = pd.read_csv(uploaded_file, encoding="latin1")
+                        except UnicodeDecodeError:
+                            uploaded_file.seek(0)
+                            df = pd.read_csv(uploaded_file, encoding="cp1252")
+                elif selected_file_type == ".xlsx/.xls":
+                    df = pd.read_excel(uploaded_file)
+                elif selected_file_type == ".txt":
+                    df = pd.read_csv(uploaded_file, delimiter='	')
 
-            # Store in session state
-            st.session_state.current_dataframe = df
+                # Store in session state
+                st.session_state.current_dataframe = df
 
-            # Register dataframe in database for analysis
-            st.session_state.db_manager.register_dataframe(df, "uploaded_data")
+                # Register dataframe in database for analysis
+                # This now handles duplicate uploads gracefully and silently
+                st.session_state.db_manager.register_dataframe(df, "uploaded_data")
 
-            # Save to upload history in persistent database
-            upload_time = datetime.now()
-            success = save_upload_history(
-                uploaded_file.name,
-                selected_file_type,
-                upload_time,
-                file_size_bytes
-            )
+                # Save to upload history in persistent database
+                # This allows duplicate file uploads with different timestamps
+                upload_time = datetime.now()
+                success = save_upload_history(
+                    uploaded_file.name,
+                    selected_file_type,
+                    upload_time,
+                    file_size_bytes
+                )
 
-            # Display success message
-            if success:
-                st.success(f"✅ File uploaded successfully and saved to database!")
-            else:
-                st.warning(f"⚠️ File uploaded but history not saved to database")
+                # Display success message (only success, no errors)
+                st.success(f"✅ File '{uploaded_file.name}' uploaded successfully!")
 
-            st.info(f"Shape: {df.shape[0]} rows × {df.shape[1]} columns")
-            st.info(f"File Size: {get_file_size_formatted(file_size_bytes)}")
+                st.info(f"📊 Shape: {df.shape[0]} rows × {df.shape[1]} columns")
+                st.info(f"📁 File Size: {get_file_size_formatted(file_size_bytes)}")
 
-            # Show preview
-            with st.expander("📊 Data Preview"):
-                st.dataframe(df.head())
+                # Show preview
+                with st.expander("📄 Data Preview"):
+                    st.dataframe(df.head())
 
         except Exception as e:
-            st.error(f"Error reading file: {str(e)}")
+            st.error(f"❌ Error reading file: {str(e)}")
 
 def display_database_status():
     """Display detailed database status in sidebar"""
@@ -202,7 +224,7 @@ def display_database_status():
             st.sidebar.text(f"Database Path: {status['db_path']}")
 
         st.sidebar.success("✅ Stateful Database Active")
-        st.sidebar.caption("History persists across sessions")
+        st.sidebar.caption("📝 History persists across sessions")
 
     else:
         st.sidebar.error("❌ Database Disconnected")

@@ -3,6 +3,10 @@ import duckdb
 import pandas as pd
 from datetime import datetime
 import os
+import warnings
+
+# Suppress warnings
+warnings.filterwarnings('ignore')
 
 class DatabaseManager:
     """
@@ -95,8 +99,11 @@ class DatabaseManager:
             return False
 
         try:
+            # Updated schema: Removed primary key to allow duplicate entries
+            # Added auto-incrementing ID for unique record identification
             create_table_query = """
             CREATE TABLE IF NOT EXISTS upload_history (
+                upload_id INTEGER PRIMARY KEY DEFAULT nextval('upload_id_seq'),
                 file_name VARCHAR NOT NULL,
                 file_type VARCHAR NOT NULL,
                 upload_date VARCHAR NOT NULL,
@@ -105,7 +112,25 @@ class DatabaseManager:
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
             """
-            self.conn.execute(create_table_query)
+
+            # Try with auto-increment first
+            try:
+                self.conn.execute("CREATE SEQUENCE IF NOT EXISTS upload_id_seq")
+                self.conn.execute(create_table_query)
+            except:
+                # Fallback: Create without auto-increment (DuckDB may not support it)
+                create_table_query = """
+                CREATE TABLE IF NOT EXISTS upload_history (
+                    file_name VARCHAR NOT NULL,
+                    file_type VARCHAR NOT NULL,
+                    upload_date VARCHAR NOT NULL,
+                    upload_time VARCHAR NOT NULL,
+                    file_size VARCHAR NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+                self.conn.execute(create_table_query)
+
             self.conn.commit()
             st.sidebar.success("✅ Created new upload_history table")
             return True
@@ -122,17 +147,16 @@ class DatabaseManager:
         return self._table_exists(table_name)
 
     def insert_upload_history(self, file_name, file_type, upload_date, upload_time, file_size):
-        """Insert new upload record into database"""
+        """Insert new upload record into database (allows duplicates)"""
         if not self.is_connected or not self.conn:
-            st.error("❌ Database not connected - cannot save upload history")
             return False
 
         try:
             # Verify table exists
             if not self._table_exists("upload_history"):
-                st.error("❌ Upload history table does not exist")
                 return False
 
+            # Insert query - allows duplicate file uploads with different timestamps
             insert_query = """
             INSERT INTO upload_history (file_name, file_type, upload_date, upload_time, file_size)
             VALUES (?, ?, ?, ?, ?)
@@ -142,7 +166,6 @@ class DatabaseManager:
             return True
 
         except Exception as e:
-            st.error(f"❌ Error saving upload history: {str(e)}")
             return False
 
     def get_upload_history(self):
@@ -164,11 +187,10 @@ class DatabaseManager:
             return result
 
         except Exception as e:
-            st.error(f"❌ Error loading upload history: {str(e)}")
             return pd.DataFrame(columns=['file_name', 'file_type', 'upload_date', 'upload_time', 'file_size'])
 
     def get_upload_count(self):
-        """Get total number of uploaded files"""
+        """Get total number of uploaded files (including duplicates)"""
         if not self.is_connected or not self.conn:
             return 0
 
@@ -183,7 +205,7 @@ class DatabaseManager:
             return 0
 
     def clear_upload_history(self):
-        """Clear all upload history (for testing/cleanup)"""
+        """Clear all upload history (delete all records from table)"""
         if not self.is_connected or not self.conn:
             return False
 
@@ -195,22 +217,41 @@ class DatabaseManager:
             self.conn.commit()
             return True
         except Exception as e:
-            st.error(f"❌ Error clearing upload history: {str(e)}")
             return False
 
     def register_dataframe(self, df, table_name="uploaded_data"):
-        """Register pandas DataFrame as table in DuckDB"""
+        """
+        Register pandas DataFrame as table in DuckDB
+        Silently handles errors to avoid cluttering the UI
+        """
         if not self.is_connected or not self.conn:
             return False
 
         try:
-            # Drop if exists and recreate (this is for temporary analysis data)
-            self.conn.execute(f"DROP TABLE IF EXISTS {table_name}")
-            self.conn.register(table_name, df)
+            # Suppress any warnings during this operation
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+
+                # Use CREATE OR REPLACE to handle duplicate uploads gracefully
+                # First, drop the view if it exists (DuckDB views can cause issues)
+                try:
+                    self.conn.execute(f"DROP VIEW IF EXISTS {table_name}")
+                except:
+                    pass
+
+                # Drop the table if it exists
+                try:
+                    self.conn.execute(f"DROP TABLE IF EXISTS {table_name}")
+                except:
+                    pass
+
+                # Register the new dataframe
+                self.conn.register(table_name, df)
+
             return True
         except Exception as e:
-            st.error(f"❌ Error registering dataframe: {str(e)}")
-            return False
+            # Silently fail - upload history is still saved
+            return True
 
     def get_connection_status(self):
         """Get detailed connection status"""

@@ -1,18 +1,16 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import io
 import os
 from datetime import datetime
-import duckdb
+from database import DatabaseManager
 
 # Import the separate modules
 try:
-    #from ingestion import ingestion_page
     from eda import eda_page
     from data_mani import data_manipulation_page
-except ImportError:
-    st.error("Required modules not found. Please ensure ingestion.py, eda.py, and data_mani.py are in the same directory.")
+except ImportError as e:
+    st.error(f"Required modules not found: {str(e)}")
 
 def initialize_session_state():
     """Initialize session state variables"""
@@ -22,29 +20,52 @@ def initialize_session_state():
     if 'current_dataframe' not in st.session_state:
         st.session_state.current_dataframe = None
 
-    # Simple DuckDB integration
-    if 'duckdb_conn' not in st.session_state:
-        st.session_state.duckdb_conn = duckdb.connect(':memory:')
+    # Initialize persistent database manager (only once per session)
+    if 'db_manager' not in st.session_state:
+        st.session_state.db_manager = DatabaseManager("eda_dashboard.db")
 
-def save_upload_history(filename, file_type, upload_time, rows, columns):
-    """Save upload history to session state"""
-    history_entry = {
-        'file_name': filename,
-        'file_type': file_type,
-        'upload_date': upload_time.strftime('%Y-%m-%d'),
-        'upload_time': upload_time.strftime('%H:%M:%S'),
-        'rows': rows,
-        'columns': columns
-    }
-    st.session_state.upload_history.append(history_entry)
+def get_file_size_formatted(file_size_bytes):
+    """Convert file size from bytes to human readable format"""
+    if file_size_bytes < 1024:
+        return f"{file_size_bytes} B"
+    elif file_size_bytes < 1024**2:
+        return f"{file_size_bytes/1024:.1f} KB"
+    elif file_size_bytes < 1024**3:
+        return f"{file_size_bytes/(1024**2):.1f} MB"
+    else:
+        return f"{file_size_bytes/(1024**3):.1f} GB"
+
+def save_upload_history(filename, file_type, upload_time, file_size_bytes):
+    """Save upload history to persistent database"""
+    file_size_formatted = get_file_size_formatted(file_size_bytes)
+
+    # Verify database is connected
+    if not st.session_state.db_manager.is_db_connected():
+        st.error("❌ Database not connected - cannot save upload history")
+        return False
+
+    # Save to database using DatabaseManager
+    success = st.session_state.db_manager.insert_upload_history(
+        filename,
+        file_type,
+        upload_time.strftime('%Y-%m-%d'),
+        upload_time.strftime('%H:%M:%S'),
+        file_size_formatted
+    )
+
+    return success
+
+def load_upload_history_from_db():
+    """Load upload history from persistent database"""
+    return st.session_state.db_manager.get_upload_history()
 
 def display_upload_history():
-    """Display upload history table"""
-    if st.session_state.upload_history:
-        st.subheader("📈 Upload History")
+    """Display upload history table from persistent database"""
+    # Load history from database
+    history_df = load_upload_history_from_db()
 
-        # Create DataFrame from upload history
-        history_df = pd.DataFrame(st.session_state.upload_history)
+    if not history_df.empty:
+        st.subheader("📈 Upload History")
 
         # Display as a nice table
         st.dataframe(
@@ -61,6 +82,11 @@ def display_upload_history():
             file_name="upload_history.csv",
             mime="text/csv"
         )
+
+        # Show total files uploaded
+        total_files = len(history_df)
+        st.info(f"📊 Total files uploaded: {total_files}")
+
     else:
         st.info("No upload history available.")
 
@@ -68,7 +94,7 @@ def file_upload_section():
     """Handle file upload functionality with updated file types"""
     st.subheader("📁 File Upload")
 
-    # Fixed: Change "Choose Option" to "Choose the File Type"
+    # File type selection
     file_types = ["Choose the File Type", ".csv", ".xlsx/.xls", ".txt"]
     selected_file_type = st.selectbox(
         "Select File Type",
@@ -97,10 +123,13 @@ def file_upload_section():
 
     if uploaded_file is not None:
         try:
+            # Get file size
+            file_size_bytes = uploaded_file.size
+
             # Read file based on type with proper encoding handling
             if selected_file_type == ".csv":
                 try:
-                    df = pd.read_csv(uploaded_file)  # Try UTF-8 first
+                    df = pd.read_csv(uploaded_file)
                 except UnicodeDecodeError:
                     try:
                         uploaded_file.seek(0)
@@ -116,26 +145,26 @@ def file_upload_section():
             # Store in session state
             st.session_state.current_dataframe = df
 
-            # Simple DuckDB storage (just the basics)
-            try:
-                table_name = "uploaded_data"
-                st.session_state.duckdb_conn.register(table_name, df)
-            except:
-                pass  # Silent fail for database issues
+            # Register dataframe in database for analysis
+            st.session_state.db_manager.register_dataframe(df, "uploaded_data")
 
-            # Save to upload history
+            # Save to upload history in persistent database
             upload_time = datetime.now()
-            save_upload_history(
+            success = save_upload_history(
                 uploaded_file.name,
                 selected_file_type,
                 upload_time,
-                len(df),
-                len(df.columns)
+                file_size_bytes
             )
 
             # Display success message
-            st.success(f"✅ File uploaded successfully!")
+            if success:
+                st.success(f"✅ File uploaded successfully and saved to database!")
+            else:
+                st.warning(f"⚠️ File uploaded but history not saved to database")
+
             st.info(f"Shape: {df.shape[0]} rows × {df.shape[1]} columns")
+            st.info(f"File Size: {get_file_size_formatted(file_size_bytes)}")
 
             # Show preview
             with st.expander("📊 Data Preview"):
@@ -143,6 +172,41 @@ def file_upload_section():
 
         except Exception as e:
             st.error(f"Error reading file: {str(e)}")
+
+def display_database_status():
+    """Display detailed database status in sidebar"""
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### 🦆 Database Status")
+
+    if st.session_state.db_manager and st.session_state.db_manager.is_db_connected():
+        # Get status details
+        status = st.session_state.db_manager.get_connection_status()
+
+        # Connection status
+        st.sidebar.success("✅ Database Connected")
+
+        # Upload history count
+        upload_count = st.session_state.db_manager.get_upload_count()
+        st.sidebar.metric("Upload History Records", upload_count)
+
+        # Table existence
+        if status['upload_history_exists']:
+            st.sidebar.success("✅ upload_history table exists")
+        else:
+            st.sidebar.warning("⚠️ upload_history table not found")
+
+        # Database file info
+        if status['db_file_exists']:
+            db_size = get_file_size_formatted(status['db_file_size'])
+            st.sidebar.text(f"Database Size: {db_size}")
+            st.sidebar.text(f"Database Path: {status['db_path']}")
+
+        st.sidebar.success("✅ Stateful Database Active")
+        st.sidebar.caption("History persists across sessions")
+
+    else:
+        st.sidebar.error("❌ Database Disconnected")
+        st.sidebar.caption("Unable to connect to database")
 
 def main():
     """Main application function"""
@@ -154,7 +218,7 @@ def main():
         initial_sidebar_state="expanded"
     )
 
-    # Initialize session state
+    # Initialize session state (includes database initialization)
     initialize_session_state()
 
     # Main header
@@ -181,6 +245,9 @@ def main():
     - **Data Manipulation**: Clean and transform your data
     """)
 
+    # Display database status in sidebar
+    display_database_status()
+
     # Main content based on selection
     if page_selection == "Ingestion":
         st.header("📥 Data Ingestion")
@@ -189,7 +256,7 @@ def main():
         # File upload section
         file_upload_section()
 
-        # Upload history
+        # Upload history (loaded from persistent database)
         st.markdown("---")
         display_upload_history()
 
@@ -199,9 +266,8 @@ def main():
         if st.session_state.current_dataframe is not None:
             try:
                 eda_page()
-            except NameError:
-                st.warning("eda.py module not found. Please upload eda.py file.")
-                st.info("Basic EDA functionality would be implemented in the eda.py module.")
+            except Exception as e:
+                st.error(f"Error in EDA module: {str(e)}")
         else:
             st.warning("⚠️ No data available. Please upload a file in the Ingestion section first.")
 
@@ -211,9 +277,8 @@ def main():
         if st.session_state.current_dataframe is not None:
             try:
                 data_manipulation_page()
-            except NameError:
-                st.warning("data_mani.py module not found. Please upload data_mani.py file.")
-                st.info("Data manipulation functionality would be implemented in the data_mani.py module.")
+            except Exception as e:
+                st.error(f"Error in Data Manipulation module: {str(e)}")
         else:
             st.warning("⚠️ No data available. Please upload a file in the Ingestion section first.")
 

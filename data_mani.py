@@ -977,3 +977,4 @@ def pattern_filter(df):
                 st.success(f"✅ Character filter applied! {len(df_filtered)} rows remaining.")
     else:
         st.warning("No text columns found!")
+

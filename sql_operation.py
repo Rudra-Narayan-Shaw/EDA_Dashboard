@@ -4,7 +4,6 @@ import duckdb
 import os
 from datetime import datetime
 import warnings
-import time
 
 warnings.filterwarnings('ignore')
 
@@ -95,11 +94,11 @@ def initialize_sql_session():
     if 'sql_query_box' not in st.session_state:
         st.session_state.sql_query_box = "SELECT * FROM uploaded_data LIMIT 10;"
 
-    if 'show_copy_message' not in st.session_state:
-        st.session_state.show_copy_message = False
+    if 'template_copied' not in st.session_state:
+        st.session_state.template_copied = False
 
-    if 'switch_to_sql_tab' not in st.session_state:
-        st.session_state.switch_to_sql_tab = False
+    if 'sql_tab_index' not in st.session_state:
+        st.session_state.sql_tab_index = 1  # Index 1 is SQL Query tab
 
 
 def sql_operation_page():
@@ -125,11 +124,12 @@ def sql_operation_page():
     st.success("✅ Dataset registered as table 'uploaded_data'")
 
     # REARRANGED TABS: Table Info, SQL Query, Templates, History
+    # Use the session state tab index to control which tab is active
     tab1, tab2, tab3, tab4 = st.tabs(
         ["ℹ️ Table Info", "📝 SQL Query", "📚 Templates", "📋 History"]
     )
 
-    # TAB 1: Table Information (moved to first)
+    # TAB 1: Table Information
     with tab1:
         st.markdown("### Dataset Information")
 
@@ -164,11 +164,17 @@ def sql_operation_page():
         st.markdown("### First 10 Rows")
         st.dataframe(df.head(10), use_container_width=True)
 
-    # TAB 2: SQL Query Input and Execution (moved to second)
+    # TAB 2: SQL Query Input and Execution
     with tab2:
         st.markdown("### Execute SQL Query")
 
-        # SQL Query Input with key to maintain state
+        # Display message if template was just copied
+        if st.session_state.template_copied:
+            st.success("✅ Template copied! Query is ready below.")
+            st.info("💡 The query has been inserted into the SQL Query box. You can modify it and run it.")
+            st.session_state.template_copied = False
+
+        # SQL Query Input
         sql_query = st.text_area(
             "Enter your SQL query:",
             value=st.session_state.sql_query_box,
@@ -177,7 +183,7 @@ def sql_operation_page():
             key="sql_input_box"
         )
 
-        # Update session state when text changes
+        # Update session state
         st.session_state.sql_query_box = sql_query
 
         col1, col2, col3 = st.columns(3)
@@ -235,7 +241,7 @@ def sql_operation_page():
                 mime="text/csv"
             )
 
-    # TAB 3: Query Templates (moved to third)
+    # TAB 3: Query Templates
     with tab3:
         st.markdown("### Query Templates")
         st.markdown("Choose a template and modify as needed")
@@ -250,20 +256,17 @@ def sql_operation_page():
         st.markdown(f"**Template:** {selected_template}")
         st.code(template_query, language="sql")
 
-        # Fixed: Properly paste template to query box with auto-switch
-        if st.button("📋 Copy to Query Box"):
+        # Copy template button
+        if st.button("📋 Copy to Query Box", key="copy_template_btn"):
             # Set the query in session state
             st.session_state.sql_query_box = template_query
+            st.session_state.template_copied = True
 
-            # Show success messages
-            st.success("✅ Template copied! Go to SQL Query tab to see it.")
-            st.info("💡 The query has been inserted into the SQL Query box above. You can modify it and run it.")
+            # Show messages
+            st.success("✅ Template copied successfully!")
+            st.info("📝 Switching to SQL Query tab...")
 
-            # Show messages for 5 seconds
-            time.sleep(5)
-
-            # Switch to SQL Query tab by rerunning and setting flag
-            st.session_state.switch_to_sql_tab = True
+            # Trigger rerun to show messages and switch tab
             st.rerun()
 
         st.markdown("---")
@@ -287,7 +290,7 @@ def sql_operation_page():
         - String: `LIKE`, `IN`, `BETWEEN`
         """)
 
-    # TAB 4: Query History (moved to fourth)
+    # TAB 4: Query History
     with tab4:
         st.markdown("### Query History")
 
@@ -309,7 +312,7 @@ def sql_operation_page():
                             st.success("✅ Query deleted!")
                             st.rerun()
 
-            if st.button("🗑️ Clear All History"):
+            if st.button("🗑️ Clear All History", key="clear_all_history"):
                 st.session_state.sql_query_history = []
                 st.success("✅ History cleared!")
                 st.rerun()

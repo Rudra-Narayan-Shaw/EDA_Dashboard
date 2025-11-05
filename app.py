@@ -13,6 +13,7 @@ warnings.filterwarnings('ignore')
 try:
     from eda import eda_page
     from data_mani import data_manipulation_page
+    from sql_operation import sql_operation_page
 except ImportError as e:
     st.error(f"Required modules not found: {str(e)}")
 
@@ -102,10 +103,6 @@ def display_upload_history():
                 else:
                     st.error("❌ Failed to delete upload history")
 
-        # Show total files uploaded
-        total_files = len(history_df)
-        st.info(f"📊 Total files uploaded: {total_files}")
-
     else:
         st.info("No upload history available.")
 
@@ -185,8 +182,7 @@ def file_upload_section():
                 # Display success message (only success, no errors)
                 st.success(f"✅ File '{uploaded_file.name}' uploaded successfully!")
 
-                st.info(f"📊 Shape: {df.shape[0]} rows × {df.shape[1]} columns")
-                st.info(f"📁 File Size: {get_file_size_formatted(file_size_bytes)}")
+                st.info(f"Shape: {df.shape[0]} rows × {df.shape[1]} columns | File Size: {get_file_size_formatted(file_size_bytes)}")
 
                 # Show preview
                 with st.expander("📄 Data Preview"):
@@ -254,7 +250,7 @@ def main():
     # Radio buttons for page selection
     page_selection = st.sidebar.radio(
         "Select a page:",
-        ["Ingestion", "EDA", "Data Manipulation"],
+        ["Ingestion", "EDA", "Data Manipulation", "SQL Operation"],
         help="Choose which functionality you want to use"
     )
 
@@ -265,6 +261,7 @@ def main():
     - **Ingestion**: Upload and preview your data
     - **EDA**: Perform exploratory data analysis  
     - **Data Manipulation**: Clean and transform your data
+    - **SQL Operation**: Execute SQL queries on your data
     """)
 
     # Display database status in sidebar
@@ -301,6 +298,17 @@ def main():
                 data_manipulation_page()
             except Exception as e:
                 st.error(f"Error in Data Manipulation module: {str(e)}")
+        else:
+            st.warning("⚠️ No data available. Please upload a file in the Ingestion section first.")
+
+    elif page_selection == "SQL Operation":
+        st.markdown(" ")
+
+        if st.session_state.current_dataframe is not None:
+            try:
+                sql_operation_page()
+            except Exception as e:
+                st.error(f"Error in SQL Operation module: {str(e)}")
         else:
             st.warning("⚠️ No data available. Please upload a file in the Ingestion section first.")
 

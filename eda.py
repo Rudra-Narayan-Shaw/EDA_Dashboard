@@ -7,7 +7,50 @@ from plotly.subplots import make_subplots
 import seaborn as sns
 import matplotlib.pyplot as plt
 from io import BytesIO
-import base64
+import warnings
+
+warnings.filterwarnings('ignore')
+
+def download_plotly_chart_png(fig, filename):
+    """Download Plotly chart as PNG"""
+    try:
+        img_bytes = fig.to_image(format="png", width=1200, height=600)
+        return img_bytes
+    except Exception as e:
+        st.warning("⚠️ For PNG export, install: pip install kaleido")
+        return None
+
+def download_plotly_chart_pdf(fig, filename):
+    """Download Plotly chart as PDF"""
+    try:
+        img_bytes = fig.to_image(format="pdf", width=1200, height=600)
+        return img_bytes
+    except Exception as e:
+        st.warning("⚠️ For PDF export, install: pip install kaleido")
+        return None
+
+def download_matplotlib_chart_png(fig, filename):
+    """Download Matplotlib chart as PNG"""
+    try:
+        buf = BytesIO()
+        fig.savefig(buf, format="png", dpi=300, bbox_inches='tight')
+        buf.seek(0)
+        return buf.getvalue()
+    except Exception as e:
+        st.error(f"❌ Error saving chart: {str(e)}")
+        return None
+
+def download_matplotlib_chart_pdf(fig, filename):
+    """Download Matplotlib chart as PDF"""
+    try:
+        buf = BytesIO()
+        fig.savefig(buf, format="pdf", dpi=300, bbox_inches='tight')
+        buf.seek(0)
+        return buf.getvalue()
+    except Exception as e:
+        st.error(f"❌ Error saving chart: {str(e)}")
+        return None
+
 
 def eda_page():
     """Exploratory Data Analysis page functionality"""
@@ -128,21 +171,30 @@ def create_histogram(df):
     # Download buttons
     col1, col2 = st.columns(2)
     with col1:
-        png_data = fig.to_image(format="png", width=1200, height=600)
-        st.download_button(
-            label="📥 Download as PNG",
-            data=png_data,
-            file_name=f"histogram_{col}.png",
-            mime="image/png"
-        )
+        png_data = download_plotly_chart_png(fig, f"histogram_{col}")
+        if png_data:
+            st.download_button(
+                label="📥 Download as PNG",
+                data=png_data,
+                file_name=f"histogram_{col}.png",
+                mime="image/png",
+                key="hist_png_download"
+            )
+        else:
+            st.button("📥 Download as PNG", disabled=True, key="hist_png_disabled")
+
     with col2:
-        pdf_data = fig.to_image(format="pdf", width=1200, height=600)
-        st.download_button(
-            label="📥 Download as PDF",
-            data=pdf_data,
-            file_name=f"histogram_{col}.pdf",
-            mime="application/pdf"
-        )
+        pdf_data = download_plotly_chart_pdf(fig, f"histogram_{col}")
+        if pdf_data:
+            st.download_button(
+                label="📥 Download as PDF",
+                data=pdf_data,
+                file_name=f"histogram_{col}.pdf",
+                mime="application/pdf",
+                key="hist_pdf_download"
+            )
+        else:
+            st.button("📥 Download as PDF", disabled=True, key="hist_pdf_disabled")
 
 
 def create_bar_chart(df):
@@ -173,21 +225,30 @@ def create_bar_chart(df):
     # Download buttons
     col1, col2 = st.columns(2)
     with col1:
-        png_data = fig.to_image(format="png", width=1200, height=600)
-        st.download_button(
-            label="📥 Download as PNG",
-            data=png_data,
-            file_name=f"barchart_{col}.png",
-            mime="image/png"
-        )
+        png_data = download_plotly_chart_png(fig, f"barchart_{col}")
+        if png_data:
+            st.download_button(
+                label="📥 Download as PNG",
+                data=png_data,
+                file_name=f"barchart_{col}.png",
+                mime="image/png",
+                key="bar_png_download"
+            )
+        else:
+            st.button("📥 Download as PNG", disabled=True, key="bar_png_disabled")
+
     with col2:
-        pdf_data = fig.to_image(format="pdf", width=1200, height=600)
-        st.download_button(
-            label="📥 Download as PDF",
-            data=pdf_data,
-            file_name=f"barchart_{col}.pdf",
-            mime="application/pdf"
-        )
+        pdf_data = download_plotly_chart_pdf(fig, f"barchart_{col}")
+        if pdf_data:
+            st.download_button(
+                label="📥 Download as PDF",
+                data=pdf_data,
+                file_name=f"barchart_{col}.pdf",
+                mime="application/pdf",
+                key="bar_pdf_download"
+            )
+        else:
+            st.button("📥 Download as PDF", disabled=True, key="bar_pdf_disabled")
 
 
 def create_scatter_plot(df):
@@ -209,21 +270,30 @@ def create_scatter_plot(df):
     # Download buttons
     col_a, col_b = st.columns(2)
     with col_a:
-        png_data = fig.to_image(format="png", width=1200, height=600)
-        st.download_button(
-            label="📥 Download as PNG",
-            data=png_data,
-            file_name=f"scatter_{col1}_{col2}.png",
-            mime="image/png"
-        )
+        png_data = download_plotly_chart_png(fig, f"scatter_{col1}_{col2}")
+        if png_data:
+            st.download_button(
+                label="📥 Download as PNG",
+                data=png_data,
+                file_name=f"scatter_{col1}_{col2}.png",
+                mime="image/png",
+                key="scatter_png_download"
+            )
+        else:
+            st.button("📥 Download as PNG", disabled=True, key="scatter_png_disabled")
+
     with col_b:
-        pdf_data = fig.to_image(format="pdf", width=1200, height=600)
-        st.download_button(
-            label="📥 Download as PDF",
-            data=pdf_data,
-            file_name=f"scatter_{col1}_{col2}.pdf",
-            mime="application/pdf"
-        )
+        pdf_data = download_plotly_chart_pdf(fig, f"scatter_{col1}_{col2}")
+        if pdf_data:
+            st.download_button(
+                label="📥 Download as PDF",
+                data=pdf_data,
+                file_name=f"scatter_{col1}_{col2}.pdf",
+                mime="application/pdf",
+                key="scatter_pdf_download"
+            )
+        else:
+            st.button("📥 Download as PDF", disabled=True, key="scatter_pdf_disabled")
 
 
 def create_pair_plot(df):
@@ -260,25 +330,30 @@ def create_pair_plot(df):
     # Download buttons
     col_a, col_b = st.columns(2)
     with col_a:
-        buf_png = BytesIO()
-        fig.savefig(buf_png, format="png", dpi=300, bbox_inches='tight')
-        buf_png.seek(0)
-        st.download_button(
-            label="📥 Download as PNG",
-            data=buf_png,
-            file_name="pairplot.png",
-            mime="image/png"
-        )
+        png_data = download_matplotlib_chart_png(fig, "pairplot")
+        if png_data:
+            st.download_button(
+                label="📥 Download as PNG",
+                data=png_data,
+                file_name="pairplot.png",
+                mime="image/png",
+                key="pair_png_download"
+            )
+        else:
+            st.button("📥 Download as PNG", disabled=True, key="pair_png_disabled")
+
     with col_b:
-        buf_pdf = BytesIO()
-        fig.savefig(buf_pdf, format="pdf", dpi=300, bbox_inches='tight')
-        buf_pdf.seek(0)
-        st.download_button(
-            label="📥 Download as PDF",
-            data=buf_pdf,
-            file_name="pairplot.pdf",
-            mime="application/pdf"
-        )
+        pdf_data = download_matplotlib_chart_pdf(fig, "pairplot")
+        if pdf_data:
+            st.download_button(
+                label="📥 Download as PDF",
+                data=pdf_data,
+                file_name="pairplot.pdf",
+                mime="application/pdf",
+                key="pair_pdf_download"
+            )
+        else:
+            st.button("📥 Download as PDF", disabled=True, key="pair_pdf_disabled")
 
 
 def create_heatmap(df):
@@ -301,21 +376,30 @@ def create_heatmap(df):
     # Download buttons
     col_a, col_b = st.columns(2)
     with col_a:
-        png_data = fig.to_image(format="png", width=1200, height=600)
-        st.download_button(
-            label="📥 Download as PNG",
-            data=png_data,
-            file_name=f"heatmap_{corr_method}.png",
-            mime="image/png"
-        )
+        png_data = download_plotly_chart_png(fig, f"heatmap_{corr_method}")
+        if png_data:
+            st.download_button(
+                label="📥 Download as PNG",
+                data=png_data,
+                file_name=f"heatmap_{corr_method}.png",
+                mime="image/png",
+                key="heat_png_download"
+            )
+        else:
+            st.button("📥 Download as PNG", disabled=True, key="heat_png_disabled")
+
     with col_b:
-        pdf_data = fig.to_image(format="pdf", width=1200, height=600)
-        st.download_button(
-            label="📥 Download as PDF",
-            data=pdf_data,
-            file_name=f"heatmap_{corr_method}.pdf",
-            mime="application/pdf"
-        )
+        pdf_data = download_plotly_chart_pdf(fig, f"heatmap_{corr_method}")
+        if pdf_data:
+            st.download_button(
+                label="📥 Download as PDF",
+                data=pdf_data,
+                file_name=f"heatmap_{corr_method}.pdf",
+                mime="application/pdf",
+                key="heat_pdf_download"
+            )
+        else:
+            st.button("📥 Download as PDF", disabled=True, key="heat_pdf_disabled")
 
 
 def create_line_chart(df):
@@ -336,21 +420,30 @@ def create_line_chart(df):
     # Download buttons
     col_a, col_b = st.columns(2)
     with col_a:
-        png_data = fig.to_image(format="png", width=1200, height=600)
-        st.download_button(
-            label="📥 Download as PNG",
-            data=png_data,
-            file_name=f"linechart_{col}.png",
-            mime="image/png"
-        )
+        png_data = download_plotly_chart_png(fig, f"linechart_{col}")
+        if png_data:
+            st.download_button(
+                label="📥 Download as PNG",
+                data=png_data,
+                file_name=f"linechart_{col}.png",
+                mime="image/png",
+                key="line_png_download"
+            )
+        else:
+            st.button("📥 Download as PNG", disabled=True, key="line_png_disabled")
+
     with col_b:
-        pdf_data = fig.to_image(format="pdf", width=1200, height=600)
-        st.download_button(
-            label="📥 Download as PDF",
-            data=pdf_data,
-            file_name=f"linechart_{col}.pdf",
-            mime="application/pdf"
-        )
+        pdf_data = download_plotly_chart_pdf(fig, f"linechart_{col}")
+        if pdf_data:
+            st.download_button(
+                label="📥 Download as PDF",
+                data=pdf_data,
+                file_name=f"linechart_{col}.pdf",
+                mime="application/pdf",
+                key="line_pdf_download"
+            )
+        else:
+            st.button("📥 Download as PDF", disabled=True, key="line_pdf_disabled")
 
 
 def create_pie_chart(df):
@@ -371,21 +464,30 @@ def create_pie_chart(df):
     # Download buttons
     col_a, col_b = st.columns(2)
     with col_a:
-        png_data = fig.to_image(format="png", width=1200, height=600)
-        st.download_button(
-            label="📥 Download as PNG",
-            data=png_data,
-            file_name=f"piechart_{col}.png",
-            mime="image/png"
-        )
+        png_data = download_plotly_chart_png(fig, f"piechart_{col}")
+        if png_data:
+            st.download_button(
+                label="📥 Download as PNG",
+                data=png_data,
+                file_name=f"piechart_{col}.png",
+                mime="image/png",
+                key="pie_png_download"
+            )
+        else:
+            st.button("📥 Download as PNG", disabled=True, key="pie_png_disabled")
+
     with col_b:
-        pdf_data = fig.to_image(format="pdf", width=1200, height=600)
-        st.download_button(
-            label="📥 Download as PDF",
-            data=pdf_data,
-            file_name=f"piechart_{col}.pdf",
-            mime="application/pdf"
-        )
+        pdf_data = download_plotly_chart_pdf(fig, f"piechart_{col}")
+        if pdf_data:
+            st.download_button(
+                label="📥 Download as PDF",
+                data=pdf_data,
+                file_name=f"piechart_{col}.pdf",
+                mime="application/pdf",
+                key="pie_pdf_download"
+            )
+        else:
+            st.button("📥 Download as PDF", disabled=True, key="pie_pdf_disabled")
 
 
 def create_radar_plot(df):
@@ -419,18 +521,27 @@ def create_radar_plot(df):
     # Download buttons
     col_a, col_b = st.columns(2)
     with col_a:
-        png_data = fig.to_image(format="png", width=1200, height=600)
-        st.download_button(
-            label="📥 Download as PNG",
-            data=png_data,
-            file_name="radarplot.png",
-            mime="image/png"
-        )
+        png_data = download_plotly_chart_png(fig, "radarplot")
+        if png_data:
+            st.download_button(
+                label="📥 Download as PNG",
+                data=png_data,
+                file_name="radarplot.png",
+                mime="image/png",
+                key="radar_png_download"
+            )
+        else:
+            st.button("📥 Download as PNG", disabled=True, key="radar_png_disabled")
+
     with col_b:
-        pdf_data = fig.to_image(format="pdf", width=1200, height=600)
-        st.download_button(
-            label="📥 Download as PDF",
-            data=pdf_data,
-            file_name="radarplot.pdf",
-            mime="application/pdf"
-        )
+        pdf_data = download_plotly_chart_pdf(fig, "radarplot")
+        if pdf_data:
+            st.download_button(
+                label="📥 Download as PDF",
+                data=pdf_data,
+                file_name="radarplot.pdf",
+                mime="application/pdf",
+                key="radar_pdf_download"
+            )
+        else:
+            st.button("📥 Download as PDF", disabled=True, key="radar_pdf_disabled")

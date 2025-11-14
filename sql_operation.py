@@ -73,13 +73,25 @@ class SQLOperationManager:
 # Query Templates
 QUERY_TEMPLATES = {
     "Select All": "SELECT * FROM uploaded_data;",
-    "Count Rows": "SELECT COUNT(*) as total_rows FROM uploaded_data;",
+    "SELECT DISTINCT": "SELECT DISTINCT column1, column2, FROM uploaded_data;",
     "Column Summary": "SELECT COUNT(*), COUNT(DISTINCT *) FROM uploaded_data;",
     "Top 10 Rows": "SELECT * FROM uploaded_data LIMIT 10;",
     "Group By": "SELECT column_name, COUNT(*) as count FROM uploaded_data GROUP BY column_name;",
-    "Average": "SELECT AVG(numeric_column) as average FROM uploaded_data;",
-    "Filter Records": "SELECT * FROM uploaded_data WHERE condition;",
     "Sort Data": "SELECT * FROM uploaded_data ORDER BY column_name DESC;",
+    "Where": "SELECT column1, column2, .. FROM uploaded_data WHERE condition;",
+    "Order By": "SELECT column1, column2, ... FROM uploaded_data ORDER BY column1, column2, ... ASC|DESC;",
+    "And": "SELECT column1, column2, ... FROM uploaded_data WHERE condition1 AND condition2 AND condition3 ...;",
+    "Or": "SELECT column1, column2, ... FROM uploaded_data WHERE condition1 OR condition2 OR condition3 ...;",
+    "Not": "SELECT column1, column2, ... FROM uploaded_data WHERE NOT condition;",
+    "Insert Into": "INSERT INTO uploaded_data VALUES (value1, value2, value3, ...);",
+    "Update": "UPDATE uploaded_data SET column1 = value1, column2 = value2, ... WHERE condition;", 
+    "Delete": "DELETE FROM uploaded_data WHERE condition;",
+    "Count": "SELECT COUNT(column_name) FROM uploaded_data WHERE condition;",
+    "Max": "SELECT MAX(column_name) FROM uploaded_data WHERE condition;",
+    "Min": "SELECT MIN(column_name) FROM uploaded_data WHERE condition;",
+    "Sum": "SELECT SUM(column_name) FROM uploaded_data WHERE condition;",
+    "Average": "SELECT AVG(numeric_column) as average FROM uploaded_data;",
+    
 }
 
 
